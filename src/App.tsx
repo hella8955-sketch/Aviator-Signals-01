@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   Plane
 } from "lucide-react";
+import { Analytics } from '@vercel/analytics/react';
 
 // --- Types ---
 
@@ -214,6 +215,7 @@ export default function App() {
           Signal Synchronized for High Stakes • End-to-End Encryption Enabled
         </p>
       </motion.div>
+      <Analytics />
     </div>
   );
 }
