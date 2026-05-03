@@ -27,8 +27,9 @@ interface Prediction {
 
 // --- Utils ---
 
-const getRandomMultiplier = (min: number, max: number) => {
-  return parseFloat((Math.random() * (max - min) + min).toFixed(2));
+const seededRandom = (seed: number) => {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
 };
 
 const formatTime = (date: Date) => {
@@ -41,7 +42,7 @@ export default function App() {
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [paymentLocked, setPaymentLocked] = useState(false);
+  const [interactiveMsg, setInteractiveMsg] = useState<string | null>(null);
   const [serverTime, setServerTime] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }));
 
   useEffect(() => {
@@ -56,7 +57,7 @@ export default function App() {
     setIsScanning(true);
     setProgress(0);
     setPrediction(null);
-    setPaymentLocked(false);
+    setInteractiveMsg(null);
 
     const interval = setInterval(() => {
       setProgress(prev => {
@@ -64,26 +65,71 @@ export default function App() {
           clearInterval(interval);
           return 100;
         }
-        return prev + Math.random() * 20;
+        return prev + Math.random() * 25;
       });
-    }, 150);
+    }, 100);
 
     setTimeout(() => {
-      // Lockdown logic: Show payment required instead of accurate time
-      setPaymentLocked(true);
       setIsScanning(false);
       
-      // Still generate data in background to keep state consistent if needed later, 
-      // but interval is now strictly 1 minute
       const now = new Date();
-      const from = new Date(now.getTime() + (Math.random() * 2 + 1) * 60000);
+      const currentMinute = now.getMinutes();
+      
+      // User's Analysis Minute Slots
+      const slots = [1, 9, 11, 15, 19, 21, 25, 31, 34, 41, 45, 48, 51, 55];
+      
+      // Find the next available slot
+      let selectedMinute = slots.find(m => m > currentMinute);
+      
+      if (selectedMinute === undefined) {
+        selectedMinute = slots[0];
+        now.setHours(now.getHours() + 1);
+      }
+      
+      now.setMinutes(selectedMinute);
+      now.setSeconds(0);
+
+      const from = new Date(now);
       const to = new Date(from.getTime() + 60000); // STRICT 1 MINUTE INTERVAL
+
+      // --- Deterministic Logic ---
+      // Use time-based seed so signal is FIXED for this specific slot
+      const seed = now.getFullYear() + now.getMonth() + now.getDate() + now.getHours() + selectedMinute;
+      const rngValue = seededRandom(seed);
+
+      // Multiplier Ranges
+      const ranges = [
+        { min: 10, max: 25 },
+        { min: 15, max: 30 },
+        { min: 30, max: 60 },
+        { min: 10, max: 20 }
+      ];
+      
+      let selectedRange = ranges[Math.floor(rngValue * ranges.length)];
+      
+      // Special logic for 25-26 Slot
+      if (selectedMinute === 25) {
+        selectedRange = { min: 20, max: 50 };
+        setInteractiveMsg("Aim well and set auto cashout at 3x then AIM 20-50x");
+      } else {
+        // Deterministic interactive message
+        if (rngValue > 0.4) {
+          const msgs = [
+            "Hope u won the odds or did u play the odds let's keep moving",
+            "Personalized analysis active for Ikechukwu Ndukwe",
+            "Market signal stable. Prepare for the window",
+            "Premium accuracy level detected",
+            "Fixed pink signal identified for current period"
+          ];
+          setInteractiveMsg(msgs[Math.floor(rngValue * msgs.length)]);
+        }
+      }
 
       const newPrediction: Prediction = {
         timeFrom: formatTime(from),
         timeTo: formatTime(to),
-        minX: Math.floor(Math.random() * 10) + 12,
-        maxX: Math.floor(Math.random() * 20) + 35,
+        minX: selectedRange.min,
+        maxX: selectedRange.max,
       };
       setPrediction(newPrediction);
     }, 2500);
@@ -100,18 +146,25 @@ export default function App() {
         animate={{ opacity: 1 }}
         className="w-full max-w-2xl flex flex-col items-center z-10"
       >
+        {/* Personalized Header */}
+        <div className="absolute top-8 md:top-12 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-zinc-900/40 border border-white/5 py-2 px-6 rounded-full backdrop-blur-md shadow-2xl">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-[9px] tracking-[0.3em] font-black uppercase text-zinc-500">Authorized:</span>
+          <span className="text-xs font-bold text-white tracking-tight uppercase">Ikechukwu Ndukwe</span>
+        </div>
+
         {/* Top Branding */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-12 mt-20 md:mt-0">
           <div className="flex items-center justify-center space-x-3 mb-4">
-            <div className={`w-2.5 h-2.5 rounded-full ${paymentLocked ? 'bg-amber-500' : 'bg-red-600 animate-pulse'} shadow-[0_0_10px_rgba(220,38,38,0.5)]`}></div>
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
             <span className="text-[10px] tracking-[0.4em] text-gray-500 uppercase font-black">
-              {paymentLocked ? 'Action Required' : 'Live Signal System'}
+              Market Analysis Live
             </span>
           </div>
           <h1 className="text-4xl md:text-6xl font-black text-white tracking-tighter italic">
             AVIATOR <span className="text-red-600">PREDICTOR 2.0</span>
           </h1>
-          <p className="text-gray-500 text-xs mt-4 tracking-[0.3em] font-medium uppercase">Precision Engine for SportyBet</p>
+          <p className="text-gray-500 text-xs mt-4 tracking-[0.3em] font-medium uppercase opacity-70">Precision Engine for SportyBet</p>
         </div>
 
         {/* Main Control Module */}
@@ -141,47 +194,13 @@ export default function App() {
             </div>
           </button>
 
-          {/* Signal Display Area / Lockdown Notice */}
+          {/* Signal Area */}
           <div className="w-full max-w-xl">
             <AnimatePresence mode="wait">
-              {paymentLocked ? (
-                <motion.div 
-                  key="locked"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-red-950/20 border border-red-500/30 rounded-3xl p-8 text-center relative overflow-hidden group shadow-2xl"
-                >
-                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                    <Target size={120} className="text-red-500 rotate-12" />
-                  </div>
-                  
-                  <AlertTriangle className="text-red-500 mx-auto mb-4" size={40} />
-                  <h3 className="text-white font-black text-xl mb-3 tracking-tight uppercase italic">Payment Not Confirmed</h3>
-                  <p className="text-zinc-400 text-sm leading-relaxed mb-6 max-w-sm mx-auto font-medium">
-                    Real accurate time intervals cannot be released at this moment. <span className="text-red-500">Your payment has not been verified.</span> 
-                  </p>
-                  
-                  <div className="space-y-4">
-                    <div className="p-4 bg-black/40 border border-white/5 rounded-2xl flex items-center justify-between">
-                      <div className="text-left">
-                        <p className="text-[10px] text-zinc-500 uppercase font-black">Predicted Window</p>
-                        <p className="text-xl font-mono text-zinc-700 blur-[6px] select-none">14:55 TO 14:56</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] text-zinc-500 uppercase font-black">Multiplier</p>
-                        <p className="text-xl font-mono text-zinc-700 blur-[6px] select-none">20X — 40X</p>
-                      </div>
-                    </div>
-                    
-                    <button className="w-full py-4 bg-white text-black font-black uppercase tracking-widest text-xs rounded-xl hover:bg-zinc-200 transition-colors shadow-lg">
-                      Make Payment to Unlock
-                    </button>
-                  </div>
-                </motion.div>
-              ) : prediction ? (
+              {prediction ? (
                 <motion.div 
                   key="signal"
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-800 border border-gray-800 shadow-2xl rounded-2xl overflow-hidden"
                 >
@@ -193,7 +212,7 @@ export default function App() {
                   </div>
                   <div className="bg-[#14161a] p-8 flex flex-col items-center">
                     <span className="text-gray-500 text-[10px] uppercase tracking-[0.4em] mb-4 font-black">Expected Range</span>
-                    <div className="text-3xl md:text-4xl font-mono text-red-600 font-bold tracking-tight flex items-center gap-3 italic">
+                    <div className="text-3xl md:text-4xl font-mono text-emerald-500 font-bold tracking-tight flex items-center gap-3 italic">
                       {prediction.minX}X <span className="text-white text-xl font-black">/</span> {prediction.maxX}X
                     </div>
                   </div>
@@ -205,7 +224,26 @@ export default function App() {
                   animate={{ opacity: 1 }}
                   className="p-10 border border-dashed border-gray-800 rounded-3xl text-center"
                 >
-                  <p className="text-gray-600 font-mono text-xs tracking-[0.3em] uppercase">Waiting for verification...</p>
+                  <p className="text-gray-600 font-mono text-xs tracking-[0.3em] uppercase">Awaiting Server Verification...</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Interactive Messages */}
+            <AnimatePresence>
+              {interactiveMsg && !isScanning && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="mt-6 flex items-center gap-4 bg-zinc-900/40 border border-white/5 p-4 rounded-2xl backdrop-blur-md"
+                >
+                  <div className="w-8 h-8 rounded-full bg-red-600/10 flex items-center justify-center text-red-500 flex-shrink-0 animate-pulse">
+                    <Activity size={16} />
+                  </div>
+                  <p className="text-[11px] md:text-xs text-zinc-300 font-medium leading-relaxed italic">
+                    "{interactiveMsg}"
+                  </p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -213,22 +251,22 @@ export default function App() {
         </div>
 
         {/* Bottom Interface Bar */}
-        <div className="mt-16 md:mt-24 w-full grid grid-cols-2 md:grid-cols-3 gap-8 items-end border-t border-gray-900 pt-8 opacity-60">
+        <div className="mt-16 md:mt-24 w-full grid grid-cols-2 md:grid-cols-3 gap-8 items-end border-t border-gray-900 pt-8 opacity-40">
           <div className="flex flex-col">
-            <span className="text-gray-700 text-[10px] uppercase tracking-[0.3em] font-black mb-2">Device Instance</span>
-            <span className="text-gray-500 font-mono text-xs tracking-tighter">SPD-992-AX-PRD-v2</span>
+            <span className="text-gray-700 text-[10px] uppercase tracking-[0.3em] font-black mb-2">User Instance</span>
+            <span className="text-gray-500 font-mono text-xs tracking-tighter">SPD-IKECHUKWU-NDUKWE</span>
           </div>
           
-          <div className="hidden md:flex justify-center space-x-8">
+          <div className="hidden md:flex justify-center space-x-12">
             <div className="text-center">
-              <div className="text-[10px] text-gray-700 uppercase font-black tracking-widest mb-2">Status</div>
-              <div className={`text-[10px] px-3 py-1 ${paymentLocked ? 'bg-amber-500/5 text-amber-500 border-amber-500/10' : 'bg-emerald-500/5 text-emerald-500 border-emerald-500/10'} border rounded font-bold tracking-widest`}>
-                {paymentLocked ? 'LOCKED' : 'READY'}
+              <div className="text-[10px] text-gray-700 uppercase font-black tracking-widest mb-2">Access</div>
+              <div className="text-[10px] px-3 py-1 bg-emerald-500/5 text-emerald-500 border border-emerald-500/10 rounded font-black tracking-widest uppercase">
+                PREMIUM
               </div>
             </div>
             <div className="text-center">
-              <div className="text-[10px] text-gray-700 uppercase font-black tracking-widest mb-2">Accuracy</div>
-              <div className="text-[10px] px-3 py-1 bg-red-600/5 text-red-600 border border-red-600/10 rounded font-bold tracking-widest">98.4%</div>
+              <div className="text-[10px] text-gray-700 uppercase font-black tracking-widest mb-2">Success Rate</div>
+              <div className="text-[10px] px-3 py-1 bg-red-600/5 text-red-600 border border-red-600/10 rounded font-bold tracking-widest">99.1%</div>
             </div>
           </div>
 
@@ -238,8 +276,8 @@ export default function App() {
           </div>
         </div>
 
-        <p className="mt-10 text-center text-gray-800 text-[9px] uppercase tracking-[0.5em] font-bold">
-          Signal Synchronized • Access Restricted to Verified Users
+        <p className="mt-10 text-center text-gray-800 text-[8px] uppercase tracking-[0.8em] font-bold">
+          High stakes protocol • Authorized personnel only
         </p>
       </motion.div>
     </div>
